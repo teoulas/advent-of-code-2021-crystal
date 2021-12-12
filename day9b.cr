@@ -111,7 +111,10 @@ INPUT
 # INPUT
 
 grid = [] of Array(Int32)
-low_points = [] of Int32
+low_points = [] of Tuple(Int32, Int32)
+basin_sizes = [] of Int32
+
+alias Point = {r: Int32, c: Int32, d: Int32}
 
 INPUT.each_line do |line|
     grid << line.split("").map(&.to_i)
@@ -120,33 +123,44 @@ end
 grid.each_with_index do |row, ri|
     row.each_with_index do |cell, ci|
         next if cell == 9
-        min = get_neighbors(grid, ri, ci).min
+        min = get_neighbors(grid, ri, ci).map { |p| p[:d] }.min
         if cell < min
-            low_points << cell
+            low_points << {ri, ci}
         end
     end
 end
 
-sum_risk = 0
-low_points.each do |p|
-    sum_risk += (p+1)
+low_points.each do |ri, ci|
+    pt = {r: ri, c: ci, d: grid[ri][ci]}
+    basin_sizes << get_basin_size(grid, Set.new([pt]))
 end
 
-p! sum_risk
+top3 = basin_sizes.sort.reverse[0..2]
+p! top3[0] * top3[1] * top3[2]
 
 def get_neighbors(grid, ri, ci)
-    neighbors = [] of Int32
+    neighbors = [] of Point
     if ri > 0 # not first row, there is one above
-        neighbors << grid[ri-1][ci]
+        neighbors << {r: ri-1, c: ci, d: grid[ri-1][ci]}
     end
     if ri < grid.size - 1 # not last row, there is one below
-        neighbors << grid[ri+1][ci]
+        neighbors << {r: ri+1, c: ci, d: grid[ri+1][ci]}
     end
     if ci > 0 # not first column, there is one on the left
-        neighbors << grid[ri][ci-1]
+        neighbors << {r: ri, c: ci-1, d: grid[ri][ci-1]}
     end
     if ci < grid[0].size - 1 # not last column, there is one on the right
-        neighbors << grid[ri][ci+1]
+        neighbors << {r: ri, c: ci+1, d: grid[ri][ci+1]}
     end
     neighbors
+end
+
+def get_basin_size(grid, set)
+    neighbors = Set(Point).new()
+    set.each do |pt|
+        higher = get_neighbors(grid, pt[:r], pt[:c]).select { |pt2| pt2[:d] < 9 && pt2[:d] > pt[:d] }
+        neighbors.concat(Set.new(higher))
+    end
+    return set.size if neighbors.subset_of?(set)
+    return get_basin_size(grid, set.concat(neighbors))
 end
